@@ -1,0 +1,4 @@
+pySerial
+glfw
+imgui[full]
+

@@ -1,0 +1,6 @@
+opencv-python
+pyrealsense2
+numpy
+ultralytics
+lapx
+omegaconf
