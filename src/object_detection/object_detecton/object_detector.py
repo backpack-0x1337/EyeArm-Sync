@@ -11,23 +11,31 @@ import cv2
 from ultralytics import YOLO
 from yolo_reader import YoloReader
 
+import numpy as np
 import json
+import sys
 
 class ObjectDetection(Node):
 
-    def __init__(self, debug:bool=True, object:str="jasmine"):
-
-        self.debug = debug
-
+    def __init__(self, argv, objects:list[str]=["cup", "bottle"]):
         # ROS Initialisation
         super().__init__("Object_Reader")
         qos_profile = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST)
         self.publisher = self.create_publisher(String, '/ObjDetection/Objects', qos_profile)
         
+        # Debug Mode
+        if len(argv) > 1 and argv[1] == "DEBUG":
+            self.debug = True
+            self.get_logger().set_level(rclpy.logging.LoggingSeverity.DEBUG)
+        else:
+            self.debug = False
+
         # Intel RealSense Initialisation
         self.rs = RealsenseCamera()
-        self.model = YOLO("./models/yolov8s_jasmine.pt")
-        self.obj_reader = YoloReader(self.model)
+        self.model = YOLO("yolov8n.pt")
+        self.obj_reader = YoloReader(self.model, rs=self.rs)
+        self.object_names = objects
+        
         
         self.get_logger().info("Object Detector Node Initialised")
         self.start()
@@ -48,9 +56,12 @@ class ObjectDetection(Node):
 
                 
                 for obj in self.obj_reader.object_list:
+                    if obj.name not in self.object_names:
+                        continue
+
                     msg_item = {
-                        "name": "ClassName",
-                        "position": (int(obj.center_x), int(obj.center_y)),
+                        "name": obj.name,
+                        "position": (int(obj.center_point_x), int(obj.center_point_y)),
                         "distance": int(obj.center_point_depth),
                     }
                     msg.append(msg_item)
@@ -58,10 +69,14 @@ class ObjectDetection(Node):
                     if self.debug: # Draw Box, class info & depth info on the Object
                         cv2.rectangle(bgr_image, (obj.top_left_x, obj.top_left_y), (obj.bottle_right_x, obj.bottom_right_y),
                                     (255, 0, 255), 1)
-                        cv2.circle(bgr_image, (obj.center_x, obj.center_y), 5, (0, 0, 255), 1)
+                        cv2.circle(bgr_image, (obj.center_pixel_x, obj.center_pixel_y), 5, (0, 0, 255), 1)
                         cv2.putText(bgr_image, self.model.names[obj.cls], (obj.top_left_x, obj.top_left_y), cv2.FONT_HERSHEY_SIMPLEX,
                                     1, (255, 0, 255), 1)
-                        cv2.putText(bgr_image, obj.info_str, (obj.bottle_right_x, obj.bottom_right_y), cv2.FONT_HERSHEY_SIMPLEX,
+                        cv2.putText(bgr_image, obj.info_str[0], (obj.top_right_x, obj.top_right_y), cv2.FONT_HERSHEY_SIMPLEX,
+                                    1, (255, 0, 255), 1)
+                        cv2.putText(bgr_image, obj.info_str[1], (obj.center_right_x, obj.center_right_y), cv2.FONT_HERSHEY_SIMPLEX,
+                                    1, (255, 0, 255), 1)
+                        cv2.putText(bgr_image, obj.info_str[2], (obj.bottle_right_x, obj.bottom_right_y), cv2.FONT_HERSHEY_SIMPLEX,
                                     1, (255, 0, 255), 1)
                 self.send_msg(msg) 
                 if self.debug:
@@ -75,6 +90,7 @@ class ObjectDetection(Node):
     def cleanup(self):
         self.rs.release()
         self.obj_reader.clear_object_list()
+        cv2.destroyAllWindows()
         self.get_logger().info("Object Detector Node Cleaned Up")
 
     def send_msg(self, msg:dict):
@@ -88,8 +104,7 @@ class ObjectDetection(Node):
 
 def main():
     rclpy.init()
-    objReaderNode = ObjectDetection()
-    rclpy.spin(objReaderNode)
+    objReaderNode = ObjectDetection(sys.argv)
     objReaderNode.destroy_node()
     rclpy.shutdown()
 

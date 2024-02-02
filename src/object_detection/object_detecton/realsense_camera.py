@@ -17,6 +17,11 @@ class RealsenseCamera:
         align_to = rs.stream.color
         self.align = rs.align(align_to)
 
+        profile = self.pipeline.get_active_profile()
+        depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
+        self.intrinsics = depth_profile.get_intrinsics()
+        self.rs2_deproject_pixel_to_point = rs.rs2_deproject_pixel_to_point
+
     def get_frame_stream(self):
         # Wait for a coherent pair of frames: depth and color
         frames = self.pipeline.wait_for_frames()
