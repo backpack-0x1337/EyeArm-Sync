@@ -18,6 +18,9 @@ This proof of concept combines YOLOv8 for object detection with the Waveshark M1
 - Precision manufacturing
 
 
+https://github.com/backpack-0x1337/EyeArm-Sync/assets/71382503/f74d5d11-9464-4a9f-9797-7d4908129a0c
+
+
 # Known Issues and Limitations
 
 ## Waveshark M1 Robot Arm Accuracy
